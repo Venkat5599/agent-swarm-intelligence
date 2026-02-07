@@ -1,340 +1,424 @@
-# 🚀 Deployment Guide - Agent Swarm Intelligence
+# 🚀 Deployment Guide
 
-## 📋 Pre-Deployment Checklist
+Complete guide for deploying Agent Swarm Intelligence to production.
 
-### ✅ Completed
-- [x] Converted to TypeScript + Bun.js
-- [x] Integrated Pony Alpha AI (working)
-- [x] Integrated Jupiter DEX (code ready)
-- [x] Integrated AugenPay SDK (code ready)
-- [x] Generated Solana keypairs
-- [x] Created all agent types
-- [x] Set up WebSocket coordination
-- [x] Updated documentation
+## 📋 Quick Checklist
 
-### ⏳ Pending
-- [ ] Fund Solana wallets with devnet SOL
-- [ ] Test Jupiter swaps with real funds
-- [ ] Configure AugenPay with real program ID
-- [ ] Test full agent swarm coordination
-- [ ] Deploy to production (if needed)
+### Before Deployment
+- [ ] Fund Solana wallets (2 SOL each on devnet)
+- [ ] Test all agents locally
+- [ ] Verify Jupiter integration
+- [ ] Test WebSocket dashboard
+- [ ] Review environment variables
 
-## 🔑 Wallet Funding (CRITICAL)
+### Deployment Steps
+- [ ] Choose deployment platform
+- [ ] Configure environment
+- [ ] Deploy backend services
+- [ ] Deploy frontend dashboard
+- [ ] Set up monitoring
+- [ ] Test production environment
 
-Your wallets need devnet SOL to function:
+## 🔑 Wallet Setup
 
-### Addresses to Fund
+### 1. Check Current Balances
+```bash
+bun run fund-wallets
+```
+
+### 2. Fund Wallets
+Visit [Solana Faucet](https://faucet.solana.com/) and request 2 SOL for each:
+
 ```
 Orchestrator: FfieHaF1ahDN4axYgUzHkmNRgJmNetNcd4AoaK1BSSHY
 Trading Agent: AJSE1sSiqPfm7zUcf7TGFeg2JLHzkLwQfr4mXQdrZ5v6
 ```
 
-### How to Fund
-1. **Via Web Faucet** (Recommended)
-   - Visit: https://faucet.solana.com/
-   - Paste address
-   - Request 2 SOL per address
-   - Wait for confirmation
-
-2. **Via Solana CLI**
-   ```bash
-   solana airdrop 2 FfieHaF1ahDN4axYgUzHkmNRgJmNetNcd4AoaK1BSSHY --url devnet
-   solana airdrop 2 AJSE1sSiqPfm7zUcf7TGFeg2JLHzkLwQfr4mXQdrZ5v6 --url devnet
-   ```
-
-3. **Check Balances**
-   ```bash
-   bun run scripts/fund-wallets.ts
-   ```
-
-## 🧪 Testing Procedure
-
-### 1. Test Orchestrator
+### 3. Verify Funding
 ```bash
+bun run fund-wallets
+# Should show: Orchestrator: 2 SOL, Trading Agent: 2 SOL
+```
+
+## 🧪 Local Testing
+
+### Test Backend
+```bash
+# Terminal 1: Start orchestrator
 bun run start
-```
 
-Expected output:
-```
-🐝 Starting Agent Swarm Intelligence Platform...
-🎯 Initializing orchestrator-ai...
-📋 Registered 4 agent types
-🦞 Setting up AugenPay bounded wallets...
-✅ AugenPay integration ready
-🌐 Swarm coordinator listening on port 3000
-✅ Announced swarm on forum
-✅ Orchestrator ready to coordinate swarm
-```
-
-### 2. Test Individual Agents
-
-**Terminal 1: Research Agent**
-```bash
-bun run start:research
-```
-
-**Terminal 2: Analysis Agent**
-```bash
-bun run start:analysis
-```
-
-**Terminal 3: Trading Agent**
-```bash
+# Terminal 2: Start trading agent
 bun run start:trading
+
+# Verify: Agent connects and shows personality
 ```
 
-**Terminal 4: Monitor Agent**
+### Test Frontend
 ```bash
-bun run start:monitor
+# Terminal 3: Start dashboard
+bun run dashboard
+
+# Open: http://localhost:5173
+# Verify: Dashboard connects, shows agents, displays metrics
 ```
 
-Each should connect to orchestrator and show:
-```
-🔍 Research Agent connected to orchestrator
-```
-
-### 3. Test Jupiter Integration
-
-Once wallets are funded:
+### Test Jupiter Integration
 ```bash
-bun run scripts/test-jupiter.ts
+bun run test:jupiter
+
+# Expected: Quote fetching works (may fail if network issues)
 ```
 
-Expected: Quote fetching and arbitrage detection working.
+## 🌐 Production Deployment
 
-### 4. Test Full Swarm
+### Option 1: Vercel + Railway (Recommended)
 
-Create a test task submission script or use the orchestrator API.
+**Frontend (Vercel)**
+```bash
+cd dashboard
+vercel --prod
+```
 
-## 🔧 Configuration
+**Backend (Railway)**
+1. Visit [railway.app](https://railway.app)
+2. Create new project
+3. Connect GitHub repo
+4. Add environment variables
+5. Deploy
 
-### Environment Variables
+**Advantages**: Easy, free tier, auto-scaling
 
-Ensure `.env` has all required values:
+### Option 2: Single VPS (DigitalOcean/AWS)
 
+**1. Create Server**
+- Ubuntu 22.04 LTS
+- 2 vCPU, 4GB RAM
+- Open ports: 3000, 5173, 8080
+
+**2. Install Dependencies**
+```bash
+# Install Bun
+curl -fsSL https://bun.sh/install | bash
+
+# Install PM2
+npm install -g pm2
+```
+
+**3. Clone & Setup**
+```bash
+git clone https://github.com/Venkat5599/agent-swarm-intelligence
+cd agent-swarm-intelligence
+bun install
+cd dashboard && bun install && cd ..
+```
+
+**4. Configure Environment**
+```bash
+# Copy .env and .keys
+nano .env  # Add your keys
+```
+
+**5. Build Frontend**
+```bash
+cd dashboard
+bun run build
+cd ..
+```
+
+**6. Start Services**
+```bash
+# Start orchestrator
+pm2 start "bun run start" --name orchestrator
+
+# Start agents
+pm2 start "bun run start:trading" --name trading
+pm2 start "bun run start:research" --name research
+pm2 start "bun run start:analysis" --name analysis
+pm2 start "bun run start:monitor" --name monitor
+
+# Serve dashboard
+pm2 start "bun run dashboard" --name dashboard
+
+# Save configuration
+pm2 save
+pm2 startup
+```
+
+**Advantages**: Full control, cost-effective
+
+### Option 3: Docker Compose
+
+**docker-compose.yml**
+```yaml
+version: '3.8'
+
+services:
+  orchestrator:
+    build: .
+    ports:
+      - "3000:3000"
+      - "8080:8080"
+    env_file: .env
+    volumes:
+      - ./.keys:/app/.keys
+    command: bun run start
+
+  trading-agent:
+    build: .
+    env_file: .env
+    volumes:
+      - ./.keys:/app/.keys
+    command: bun run start:trading
+    depends_on:
+      - orchestrator
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "5173:5173"
+    depends_on:
+      - orchestrator
+```
+
+**Deploy**
+```bash
+docker-compose up -d
+```
+
+**Advantages**: Containerized, reproducible, easy scaling
+
+## 🔧 Environment Configuration
+
+### Required Variables
 ```env
-# Colosseum (Required)
-COLOSSEUM_API_KEY=0caa138d42faadcd795b8fff16b4a3dd86cad1ed24ba2c270d6fd11b4e61f222
+# Colosseum
+COLOSSEUM_API_KEY=your_key_here
 AGENT_NAME=orchestrator-ai
 AGENT_ID=857
 
-# Solana (Required)
+# Solana
 SOLANA_RPC_URL=https://api.devnet.solana.com
 ORCHESTRATOR_KEYPAIR_PATH=.keys/orchestrator.json
 TRADING_AGENT_KEYPAIR_PATH=.keys/trading-agent.json
 
-# OpenRouter (Required)
-OPENROUTER_API_KEY=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
+# OpenRouter (Pony Alpha)
+OPENROUTER_API_KEY=your_key_here
 OPENROUTER_MODEL=openrouter/pony-alpha
 
-# AugenPay (Optional - needs real program ID)
-AUGENPAY_PROGRAM_ID=AugenPayProgramId111111111111111111111111111
-
-# Orchestrator (Optional)
+# Orchestrator
 ORCHESTRATOR_PORT=3000
 ```
 
-### Security Checklist
+### Optional Variables
+```env
+# AugenPay (when configured)
+AUGENPAY_PROGRAM_ID=your_program_id
 
-- [x] `.keys/` directory in `.gitignore`
-- [x] `.env` file in `.gitignore`
-- [x] Private keys never committed
-- [x] Using devnet (not mainnet)
-- [ ] AugenPay bounded wallets configured (when ready)
-
-## 🎯 Production Deployment
-
-### Option 1: Cloud VM (Recommended)
-
-**DigitalOcean / AWS / GCP**
-
-1. **Create VM**
-   - Ubuntu 22.04 LTS
-   - 2 CPU, 4GB RAM minimum
-   - Open port 3000 for WebSocket
-
-2. **Install Bun**
-   ```bash
-   curl -fsSL https://bun.sh/install | bash
-   ```
-
-3. **Clone & Setup**
-   ```bash
-   git clone https://github.com/Venkat5599/agent-swarm-intelligence
-   cd agent-swarm-intelligence
-   bun install
-   ```
-
-4. **Configure**
-   ```bash
-   # Copy .env and .keys from local
-   scp .env user@server:/path/to/project/
-   scp -r .keys user@server:/path/to/project/
-   ```
-
-5. **Run with PM2**
-   ```bash
-   bun add -g pm2
-   pm2 start "bun run start" --name orchestrator
-   pm2 start "bun run start:trading" --name trading-agent
-   pm2 start "bun run start:research" --name research-agent
-   pm2 start "bun run start:analysis" --name analysis-agent
-   pm2 start "bun run start:monitor" --name monitor-agent
-   pm2 save
-   pm2 startup
-   ```
-
-### Option 2: Docker (Alternative)
-
-Create `Dockerfile`:
-```dockerfile
-FROM oven/bun:1
-
-WORKDIR /app
-
-COPY package.json bun.lockb ./
-RUN bun install
-
-COPY . .
-
-EXPOSE 3000
-
-CMD ["bun", "run", "start"]
+# Custom RPC (for better performance)
+SOLANA_RPC_URL=https://your-custom-rpc.com
 ```
-
-Build and run:
-```bash
-docker build -t agent-swarm .
-docker run -p 3000:3000 --env-file .env -v $(pwd)/.keys:/app/.keys agent-swarm
-```
-
-### Option 3: Kubernetes (Advanced)
-
-For high availability and scaling, deploy to Kubernetes with:
-- Orchestrator as Deployment
-- Each agent type as separate Deployment
-- Service for WebSocket communication
-- ConfigMap for environment variables
-- Secret for private keys
 
 ## 📊 Monitoring
 
 ### Health Checks
-
 ```bash
-# Check orchestrator status
+# Check orchestrator
 curl http://localhost:3000/health
 
-# Check agent connections
+# Check WebSocket
+wscat -c ws://localhost:8080
+
+# Check agents
 bun run status
-
-# Check wallet balances
-bun run scripts/fund-wallets.ts
 ```
 
-### Logs
-
+### PM2 Monitoring
 ```bash
-# PM2 logs
+# View all processes
+pm2 list
+
+# View logs
 pm2 logs orchestrator
-pm2 logs trading-agent
+pm2 logs trading
 
-# Docker logs
-docker logs -f agent-swarm
-
-# Kubernetes logs
-kubectl logs -f deployment/orchestrator
+# Monitor resources
+pm2 monit
 ```
 
-## 🐛 Troubleshooting
+### Metrics to Track
+- Agent connection status
+- Task completion rate
+- WebSocket connections
+- Memory usage
+- CPU usage
+- Error rates
+
+## 🐛 Common Issues
+
+### Port Already in Use
+```bash
+# Find process using port
+netstat -ano | findstr :3000
+
+# Kill process (Windows)
+taskkill /F /PID <pid>
+
+# Kill process (Linux/Mac)
+kill -9 <pid>
+```
 
 ### Agents Not Connecting
+1. Verify orchestrator is running
+2. Check firewall settings
+3. Verify WebSocket port (3000) is open
+4. Check `.env` configuration
 
-**Problem**: Agents can't connect to orchestrator
-
-**Solution**:
-1. Check orchestrator is running: `curl http://localhost:3000`
-2. Check firewall allows port 3000
-3. Verify `ORCHESTRATOR_PORT` in `.env`
+### Dashboard Not Loading
+1. Check if dashboard is running on port 5173
+2. Verify WebSocket URL in dashboard config
+3. Check browser console for errors
+4. Try clearing browser cache
 
 ### Jupiter API Errors
-
-**Problem**: "Unable to connect" or rate limiting
-
-**Solution**:
 1. Check internet connectivity
-2. Try different RPC endpoint
-3. Wait a few minutes (rate limit)
-4. Use Jupiter API key (if available)
+2. Verify RPC endpoint is working
+3. Try different RPC provider
+4. Check for rate limiting
 
-### Wallet Insufficient Funds
+### Out of Memory
+1. Increase server RAM
+2. Restart services: `pm2 restart all`
+3. Check for memory leaks in logs
+4. Consider horizontal scaling
 
-**Problem**: "Insufficient funds" errors
+## 🔒 Security Best Practices
 
-**Solution**:
-1. Check balances: `bun run scripts/fund-wallets.ts`
-2. Fund via faucet: https://faucet.solana.com/
-3. Wait for confirmation (30-60 seconds)
+### Production Checklist
+- [ ] Use environment variables for secrets
+- [ ] Never commit `.env` or `.keys/`
+- [ ] Use HTTPS for production
+- [ ] Enable firewall rules
+- [ ] Regular security updates
+- [ ] Monitor for suspicious activity
+- [ ] Use strong API keys
+- [ ] Implement rate limiting
 
-### TypeScript Errors
+### Recommended Tools
+- **SSL**: Let's Encrypt (free)
+- **Firewall**: UFW (Ubuntu) or Security Groups (AWS)
+- **Monitoring**: PM2, Datadog, or New Relic
+- **Logging**: Winston, Pino, or CloudWatch
 
-**Problem**: Type errors when running
+## 📈 Scaling
 
-**Solution**:
-1. Check `tsconfig.json` is present
-2. Run `bun install` to ensure types are installed
-3. Restart IDE/editor for IntelliSense
+### Horizontal Scaling
+```bash
+# Start multiple trading agents
+pm2 start "bun run start:trading" --name trading-1
+pm2 start "bun run start:trading" --name trading-2
+pm2 start "bun run start:trading" --name trading-3
+```
 
-## 🎉 Success Criteria
+### Load Balancing
+Use Nginx or HAProxy to distribute load:
 
-Your deployment is successful when:
+```nginx
+upstream orchestrator {
+    server localhost:3000;
+    server localhost:3001;
+    server localhost:3002;
+}
 
-- ✅ Orchestrator starts without errors
-- ✅ All 4 agents connect successfully
-- ✅ Pony Alpha responds to task analysis
-- ✅ Jupiter quotes are fetched successfully
-- ✅ Wallets have sufficient SOL
-- ✅ WebSocket communication works
-- ✅ Tasks can be submitted and completed
+server {
+    listen 80;
+    location / {
+        proxy_pass http://orchestrator;
+    }
+}
+```
 
-## 📞 Support
+### Database (Optional)
+For persistent storage, add PostgreSQL or MongoDB:
+```bash
+# Store task history
+# Store agent metrics
+# Store trading history
+```
 
-- **GitHub Issues**: https://github.com/Venkat5599/agent-swarm-intelligence/issues
-- **Colosseum Discord**: https://discord.gg/colosseum
-- **Solana Discord**: https://discord.gg/solana
+## 🎯 Performance Optimization
 
-## 🏆 Hackathon Submission
+### Backend
+- Use Bun.js (already 3x faster than Node.js)
+- Enable HTTP/2
+- Implement caching
+- Optimize database queries
+- Use connection pooling
 
-Before submitting:
+### Frontend
+- Build for production: `bun run build`
+- Enable gzip compression
+- Use CDN for static assets
+- Implement lazy loading
+- Optimize images
 
-1. **Test Everything**
-   - [ ] All agents working
-   - [ ] Jupiter integration tested
-   - [ ] Pony Alpha responding
-   - [ ] Documentation complete
+### Network
+- Use faster RPC endpoint
+- Implement request batching
+- Add retry logic
+- Use WebSocket compression
 
-2. **Update GitHub**
-   ```bash
-   git add .
-   git commit -m "feat: complete TypeScript migration with real integrations"
-   git push origin main
-   ```
+## 📞 Support & Resources
 
-3. **Submit Project**
-   ```bash
-   bun run scripts/submit-project.ts
-   ```
+### Documentation
+- [Bun.js Docs](https://bun.sh/docs)
+- [Solana Docs](https://docs.solana.com/)
+- [Jupiter Docs](https://docs.jup.ag/)
+- [React Docs](https://react.dev/)
 
-4. **Create Demo Video**
-   - Show orchestrator starting
-   - Show agents connecting
-   - Show task execution
-   - Show Jupiter quote fetching
-   - Show Pony Alpha coordination
+### Community
+- [Colosseum Discord](https://discord.gg/colosseum)
+- [Solana Discord](https://discord.gg/solana)
+- [GitHub Issues](https://github.com/Venkat5599/agent-swarm-intelligence/issues)
+
+### Monitoring Services
+- [PM2 Plus](https://pm2.io/) - Process monitoring
+- [Datadog](https://www.datadoghq.com/) - Full-stack monitoring
+- [Sentry](https://sentry.io/) - Error tracking
+
+## ✅ Post-Deployment Checklist
+
+- [ ] All services running
+- [ ] Dashboard accessible
+- [ ] Agents connecting
+- [ ] WebSocket working
+- [ ] Metrics tracking
+- [ ] Logs configured
+- [ ] Backups set up
+- [ ] Monitoring alerts
+- [ ] Documentation updated
+- [ ] Team notified
+
+## 🎬 Demo Preparation
+
+### For Hackathon Judges
+
+1. **Prepare Environment**
+   - Ensure all services are running
+   - Fund wallets with sufficient SOL
+   - Test all features beforehand
+
+2. **Demo Script** (2 minutes)
+   - Show dashboard (0:15)
+   - Start orchestrator (0:20)
+   - Start agents (0:25)
+   - Show live coordination (0:30)
+   - Explain tech stack (0:30)
+
+3. **Backup Plan**
+   - Record video demo
+   - Prepare screenshots
+   - Have local environment ready
 
 ---
 
-**Good luck with the hackathon! 🚀**
-
-Deadline: February 12, 2026
-Prize Pool: $100,000 USDC
+**Ready to deploy? Start with local testing, then choose your deployment option!** 🚀
