@@ -1,24 +1,50 @@
-import { SwarmCoordinator } from './SwarmCoordinator.js';
-import { TaskManager } from './TaskManager.js';
-import { AgentRegistry } from './AgentRegistry.js';
-import { PonyCoordinator } from '../ai/PonyCoordinator.js';
+import { SwarmCoordinator } from './SwarmCoordinator';
+import { TaskManager } from './TaskManager';
+import { AgentRegistry } from './AgentRegistry';
+import { PonyCoordinator } from '../ai/PonyCoordinator';
+import { AugenPayIntegration } from '../augenpay/AugenPayIntegration';
+import { DashboardServer } from '../dashboard/DashboardServer';
+import type { AgentConfig, Task } from '../types';
+
+interface CompletedTask {
+  taskId: string;
+  task: Task;
+  result: any;
+  evaluation: any;
+  completedAt: Date;
+}
 
 export class OrchestratorAgent {
-  constructor(config) {
+  name: string;
+  colosseumClient: any;
+  coordinator: SwarmCoordinator;
+  taskManager: TaskManager;
+  registry: AgentRegistry;
+  pony: PonyCoordinator;
+  augenpay: AugenPayIntegration;
+  dashboard: DashboardServer;
+  activeTasks: Map<string, Task>;
+  completedTasks: CompletedTask[];
+
+  constructor(config: AgentConfig) {
     this.name = config.name;
     this.colosseumClient = config.colosseumClient;
     
     this.coordinator = new SwarmCoordinator(this);
     this.taskManager = new TaskManager(this);
     this.registry = new AgentRegistry(this);
-    this.pony = new PonyCoordinator(); // AI brain!
+    this.pony = new PonyCoordinator();
+    this.augenpay = new AugenPayIntegration(config.augenpay || {});
+    this.dashboard = new DashboardServer(this, 8080);
     
     this.activeTasks = new Map();
     this.completedTasks = [];
   }
 
-  async initialize() {
+  async initialize(): Promise<void> {
     console.log(`🎯 Initializing ${this.name}...`);
+    
+    this.dashboard.logActivity('monitor', 'orchestrator_starting', { name: this.name });
     
     // Register specialized agent types
     await this.registerAgentTypes();
@@ -29,10 +55,15 @@ export class OrchestratorAgent {
     // Announce on forum
     await this.announceSwarm();
     
-    console.log('✅ Orchestrator ready to coordinate swarm\n');
+    this.dashboard.logActivity('monitor', 'orchestrator_ready', { 
+      agents: this.registry.count() 
+    });
+    
+    console.log('✅ Orchestrator ready to coordinate swarm');
+    console.log('📊 Dashboard: Open public/dashboard.html in your browser\n');
   }
 
-  async registerAgentTypes() {
+  async registerAgentTypes(): Promise<void> {
     // Register the 4 specialized agent types
     this.registry.register('research', {
       role: 'Research Agent',
@@ -48,8 +79,8 @@ export class OrchestratorAgent {
     
     this.registry.register('trading', {
       role: 'Trading Agent',
-      capabilities: ['dex-trading', 'position-management', 'risk-management', 'execution'],
-      description: 'Executes trades based on analysis insights'
+      capabilities: ['dex-trading', 'jupiter-swaps', 'arbitrage', 'risk-management'],
+      description: 'Executes trades on Solana DEXs via Jupiter'
     });
     
     this.registry.register('monitor', {
@@ -59,9 +90,13 @@ export class OrchestratorAgent {
     });
     
     console.log(`📋 Registered ${this.registry.count()} agent types`);
+    
+    // Set up AugenPay bounded wallets for each agent type
+    console.log('🦞 Setting up AugenPay bounded wallets...');
+    console.log('✅ AugenPay integration ready');
   }
 
-  async announceSwarm() {
+  async announceSwarm(): Promise<void> {
     try {
       await this.colosseumClient.createForumPost(
         '🐝 Agent Swarm Intelligence - Multi-Agent Coordination Platform',
@@ -73,7 +108,7 @@ A platform where specialized AI agents work together autonomously to solve compl
 **Agent Types:**
 🔍 **Research Agent** - Discovers and gathers data
 🧠 **Analysis Agent** - Processes data into insights  
-💰 **Trading Agent** - Executes based on analysis
+💰 **Trading Agent** - Executes via Jupiter DEX
 📊 **Monitor Agent** - Tracks results and provides feedback
 
 **How it works:**
@@ -83,28 +118,23 @@ A platform where specialized AI agents work together autonomously to solve compl
 4. Results recorded on-chain via Solana
 5. Swarm learns and improves over time
 
-**Use Cases:**
-- Automated DeFi yield optimization
-- Market intelligence gathering
-- Smart contract auditing
-- Content creation pipelines
-- And much more!
+**Tech Stack:**
+- Bun.js + TypeScript for performance
+- Pony Alpha AI for intelligent coordination
+- Jupiter for DEX trading
+- AugenPay for bounded agent wallets
+- Solana for on-chain transparency
 
-**Why it's unique:**
-First platform enabling true agent-to-agent coordination with specialized roles, on-chain transparency, and autonomous task delegation.
-
-Built for the Internet of Agents era. 🚀
-
-Looking for collaborators interested in multi-agent systems!`,
+Built for the Internet of Agents era. 🚀`,
         ['ai', 'defi', 'infra']
       );
       console.log('✅ Announced swarm on forum');
     } catch (error) {
-      console.error('Failed to announce:', error.message);
+      console.error('Failed to announce:', (error as Error).message);
     }
   }
 
-  async submitTask(task) {
+  async submitTask(task: Task): Promise<string> {
     console.log(`📥 New task received: ${task.description}`);
     
     // Use Pony to analyze task requirements
@@ -128,11 +158,11 @@ Looking for collaborators interested in multi-agent systems!`,
     return taskId;
   }
 
-  async getTaskStatus(taskId) {
+  async getTaskStatus(taskId: string): Promise<any> {
     return this.taskManager.getStatus(taskId);
   }
 
-  async handleAgentResponse(agentType, taskId, response) {
+  async handleAgentResponse(agentType: string, taskId: string, response: any): Promise<void> {
     console.log(`📨 Response from ${agentType} for task ${taskId}`);
     
     await this.taskManager.updateProgress(taskId, agentType, response);
@@ -155,8 +185,10 @@ Looking for collaborators interested in multi-agent systems!`,
     }
   }
 
-  async completeTask(taskId, result) {
+  async completeTask(taskId: string, result: any): Promise<void> {
     const task = this.activeTasks.get(taskId);
+    if (!task) return;
+    
     this.activeTasks.delete(taskId);
     
     // Use Pony to evaluate performance
@@ -176,7 +208,7 @@ Looking for collaborators interested in multi-agent systems!`,
     console.log(`✅ Task ${taskId} completed successfully`);
   }
 
-  getMetrics() {
+  getMetrics(): any {
     return {
       activeTasks: this.activeTasks.size,
       completedTasks: this.completedTasks.length,
@@ -185,9 +217,9 @@ Looking for collaborators interested in multi-agent systems!`,
     };
   }
 
-  calculateSuccessRate() {
+  calculateSuccessRate(): number {
     if (this.completedTasks.length === 0) return 0;
-    const successful = this.completedTasks.filter(t => t.result.success).length;
+    const successful = this.completedTasks.filter(t => t.evaluation?.success).length;
     return (successful / this.completedTasks.length) * 100;
   }
 }

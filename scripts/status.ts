@@ -1,12 +1,11 @@
-import 'dotenv/config';
-import { ColosseumClient } from '../src/colosseum/ColosseumClient.js';
+import { ColosseumClient } from '../src/colosseum/ColosseumClient';
 
 async function checkStatus() {
   const apiKey = process.env.COLOSSEUM_API_KEY;
   
   if (!apiKey || apiKey === 'your_api_key_here') {
     console.error('❌ Please set COLOSSEUM_API_KEY in .env file');
-    console.log('Run: npm run register first');
+    console.log('Run: bun run register first');
     process.exit(1);
   }
 
@@ -49,7 +48,7 @@ async function checkStatus() {
     
     if (status.nextSteps && status.nextSteps.length > 0) {
       console.log('🎯 Suggested Next Steps:');
-      status.nextSteps.forEach((step, i) => {
+      status.nextSteps.forEach((step: string, i: number) => {
         console.log(`   ${i + 1}. ${step}`);
       });
       console.log();
@@ -66,7 +65,7 @@ async function checkStatus() {
       console.log(`   URL: https://colosseum.com/agent-hackathon/projects/${project.slug}\n`);
     } catch (e) {
       console.log('📦 Project Status: No project created yet\n');
-      console.log('   Create project: npm run create-project\n');
+      console.log('   Create project: bun run create-project\n');
     }
     
     // Check team status
@@ -81,7 +80,7 @@ async function checkStatus() {
     }
     
   } catch (error) {
-    console.error('❌ Failed to get status:', error.message);
+    console.error('❌ Failed to get status:', (error as Error).message);
   }
 }
 

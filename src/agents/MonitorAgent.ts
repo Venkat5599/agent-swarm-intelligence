@@ -1,14 +1,38 @@
 import WebSocket from 'ws';
 
+interface MonitorAgentConfig {
+  id?: string;
+  orchestratorUrl?: string;
+}
+
+interface Message {
+  type: string;
+  taskId?: string;
+  task?: any;
+}
+
+interface Metric {
+  taskId: string;
+  startTime: Date;
+  agentsInvolved: string[];
+  status: string;
+  timestamp: string;
+}
+
 export class MonitorAgent {
-  constructor(config) {
+  private id: string;
+  private orchestratorUrl: string;
+  private ws: WebSocket | null;
+  private metrics: Metric[];
+
+  constructor(config: MonitorAgentConfig) {
     this.id = config.id || 'monitor-1';
     this.orchestratorUrl = config.orchestratorUrl || 'ws://localhost:3000';
     this.ws = null;
     this.metrics = [];
   }
 
-  async connect() {
+  async connect(): Promise<void> {
     this.ws = new WebSocket(this.orchestratorUrl, {
       headers: {
         'x-agent-type': 'monitor',
@@ -21,21 +45,35 @@ export class MonitorAgent {
       this.sendStatus();
     });
 
-    this.ws.on('message', async (data) => {
-      const message = JSON.parse(data.toString());
-      await this.handleMessage(message);
+    this.ws.on('message', async (data: WebSocket.Data) => {
+      try {
+        const message = JSON.parse(data.toString()) as Message;
+        await this.handleMessage(message);
+      } catch (err) {
+        console.error('⚠️ Failed to parse message:', (err as Error).message);
+      }
+    });
+
+    this.ws.on('close', () => {
+      console.log('🔌 Disconnected from orchestrator');
+    });
+
+    this.ws.on('error', (err: Error) => {
+      console.error('❌ WebSocket error:', err.message);
     });
   }
 
-  async handleMessage(message) {
+  private async handleMessage(message: Message): Promise<void> {
     switch (message.type) {
       case 'TASK_ASSIGNMENT':
-        await this.executeTask(message.taskId, message.task);
+        if (message.taskId && message.task) {
+          await this.executeTask(message.taskId, message.task);
+        }
         break;
     }
   }
 
-  async executeTask(taskId, task) {
+  private async executeTask(taskId: string, task: any): Promise<void> {
     console.log(`📊 Monitor Agent tracking task: ${taskId}`);
     
     const metrics = await this.trackPerformance(task);
@@ -43,7 +81,7 @@ export class MonitorAgent {
     this.sendResult(taskId, { metrics });
   }
 
-  async trackPerformance(task) {
+  private async trackPerformance(task: any): Promise<any> {
     console.log('📈 Tracking swarm performance...');
     
     // In real implementation:
@@ -52,7 +90,7 @@ export class MonitorAgent {
     // - Anomaly detection
     // - Feedback generation
     
-    const metric = {
+    const metric: Metric = {
       taskId: task.id,
       startTime: new Date(),
       agentsInvolved: ['research', 'analysis', 'trading'],
@@ -72,7 +110,9 @@ export class MonitorAgent {
     };
   }
 
-  sendResult(taskId, result) {
+  private sendResult(taskId: string, result: any): void {
+    if (!this.ws) return;
+    
     this.ws.send(JSON.stringify({
       type: 'TASK_COMPLETE',
       taskId,
@@ -81,7 +121,9 @@ export class MonitorAgent {
     console.log(`✅ Monitoring complete for task ${taskId}`);
   }
 
-  sendStatus() {
+  private sendStatus(): void {
+    if (!this.ws) return;
+    
     this.ws.send(JSON.stringify({
       type: 'AGENT_STATUS',
       status: 'ready',
@@ -90,7 +132,7 @@ export class MonitorAgent {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.main) {
   const agent = new MonitorAgent({ id: process.env.AGENT_ID || 'monitor-1' });
   agent.connect();
 }

@@ -1,6 +1,19 @@
 import OpenAI from 'openai';
+import type { Task, TaskAnalysis, Coordination, Evaluation } from '../types';
+
+function safeJsonParse<T>(text: string, fallback: T): T {
+  try {
+    return JSON.parse(text) as T;
+  } catch (err) {
+    console.error('⚠️ Failed to parse AI response as JSON:', (err as Error).message);
+    return fallback;
+  }
+}
 
 export class PonyCoordinator {
+  private client: OpenAI;
+  private model: string;
+
   constructor() {
     this.client = new OpenAI({
       baseURL: 'https://openrouter.ai/api/v1',
@@ -14,7 +27,7 @@ export class PonyCoordinator {
     this.model = process.env.OPENROUTER_MODEL || 'openrouter/pony-alpha';
   }
 
-  async analyzeTask(task) {
+  async analyzeTask(task: Task): Promise<TaskAnalysis> {
     console.log('🤖 Pony analyzing task requirements...');
     
     const response = await this.client.chat.completions.create({
@@ -45,13 +58,22 @@ Respond with JSON: {
       response_format: { type: 'json_object' }
     });
     
-    const analysis = JSON.parse(response.choices[0].message.content);
+    const analysis = safeJsonParse<TaskAnalysis>(
+      response.choices[0].message.content || '{}',
+      {
+        agents: ['research', 'analysis', 'monitor'],
+        priority: 'medium',
+        estimatedDuration: 10000,
+        reasoning: 'Fallback: could not parse AI response'
+      }
+    );
+    
     console.log(`✅ Pony recommends: ${analysis.agents.join(', ')}`);
     
     return analysis;
   }
 
-  async generateStrategy(taskType, data) {
+  async generateStrategy(taskType: string, data: any): Promise<string> {
     console.log('🧠 Pony generating execution strategy...');
     
     const response = await this.client.chat.completions.create({
@@ -68,10 +90,10 @@ Respond with JSON: {
       ]
     });
     
-    return response.choices[0].message.content;
+    return response.choices[0].message.content || '';
   }
 
-  async coordinateAgents(agentResponses) {
+  async coordinateAgents(agentResponses: any): Promise<Coordination> {
     console.log('🎯 Pony coordinating agent responses...');
     
     const response = await this.client.chat.completions.create({
@@ -96,13 +118,22 @@ Respond with JSON: {
       response_format: { type: 'json_object' }
     });
     
-    const coordination = JSON.parse(response.choices[0].message.content);
+    const coordination = safeJsonParse<Coordination>(
+      response.choices[0].message.content || '{}',
+      {
+        action: 'proceed with caution',
+        confidence: 0.5,
+        reasoning: 'Fallback: could not parse AI response',
+        nextSteps: ['retry analysis']
+      }
+    );
+    
     console.log(`✅ Pony decision: ${coordination.action}`);
     
     return coordination;
   }
 
-  async evaluateResults(task, results) {
+  async evaluateResults(task: Task, results: any): Promise<Evaluation> {
     console.log('📊 Pony evaluating swarm performance...');
     
     const response = await this.client.chat.completions.create({
@@ -127,10 +158,18 @@ Respond with JSON: {
       response_format: { type: 'json_object' }
     });
     
-    return JSON.parse(response.choices[0].message.content);
+    return safeJsonParse<Evaluation>(
+      response.choices[0].message.content || '{}',
+      {
+        success: false,
+        score: 0,
+        feedback: 'Fallback: could not parse AI response',
+        improvements: ['retry evaluation']
+      }
+    );
   }
 
-  async handleConflict(conflictingResponses) {
+  async handleConflict(conflictingResponses: any): Promise<string> {
     console.log('⚖️ Pony resolving agent conflict...');
     
     const response = await this.client.chat.completions.create({
@@ -147,6 +186,6 @@ Respond with JSON: {
       ]
     });
     
-    return response.choices[0].message.content;
+    return response.choices[0].message.content || '';
   }
 }

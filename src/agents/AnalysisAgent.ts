@@ -1,13 +1,28 @@
 import WebSocket from 'ws';
 
+interface AnalysisAgentConfig {
+  id?: string;
+  orchestratorUrl?: string;
+}
+
+interface Message {
+  type: string;
+  taskId?: string;
+  task?: any;
+}
+
 export class AnalysisAgent {
-  constructor(config) {
+  private id: string;
+  private orchestratorUrl: string;
+  private ws: WebSocket | null;
+
+  constructor(config: AnalysisAgentConfig) {
     this.id = config.id || 'analysis-1';
     this.orchestratorUrl = config.orchestratorUrl || 'ws://localhost:3000';
     this.ws = null;
   }
 
-  async connect() {
+  async connect(): Promise<void> {
     this.ws = new WebSocket(this.orchestratorUrl, {
       headers: {
         'x-agent-type': 'analysis',
@@ -20,21 +35,35 @@ export class AnalysisAgent {
       this.sendStatus();
     });
 
-    this.ws.on('message', async (data) => {
-      const message = JSON.parse(data.toString());
-      await this.handleMessage(message);
+    this.ws.on('message', async (data: WebSocket.Data) => {
+      try {
+        const message = JSON.parse(data.toString()) as Message;
+        await this.handleMessage(message);
+      } catch (err) {
+        console.error('⚠️ Failed to parse message:', (err as Error).message);
+      }
+    });
+
+    this.ws.on('close', () => {
+      console.log('🔌 Disconnected from orchestrator');
+    });
+
+    this.ws.on('error', (err: Error) => {
+      console.error('❌ WebSocket error:', err.message);
     });
   }
 
-  async handleMessage(message) {
+  private async handleMessage(message: Message): Promise<void> {
     switch (message.type) {
       case 'TASK_ASSIGNMENT':
-        await this.executeTask(message.taskId, message.task);
+        if (message.taskId && message.task) {
+          await this.executeTask(message.taskId, message.task);
+        }
         break;
     }
   }
 
-  async executeTask(taskId, task) {
+  private async executeTask(taskId: string, task: any): Promise<void> {
     console.log(`🧠 Analysis Agent executing task: ${taskId}`);
     
     const insights = await this.analyzeData(task);
@@ -42,7 +71,7 @@ export class AnalysisAgent {
     this.sendResult(taskId, { insights });
   }
 
-  async analyzeData(task) {
+  private async analyzeData(task: any): Promise<any> {
     console.log('📈 Analyzing data and generating insights...');
     
     // In real implementation:
@@ -61,7 +90,9 @@ export class AnalysisAgent {
     };
   }
 
-  sendResult(taskId, result) {
+  private sendResult(taskId: string, result: any): void {
+    if (!this.ws) return;
+    
     this.ws.send(JSON.stringify({
       type: 'TASK_COMPLETE',
       taskId,
@@ -70,7 +101,9 @@ export class AnalysisAgent {
     console.log(`✅ Analysis complete for task ${taskId}`);
   }
 
-  sendStatus() {
+  private sendStatus(): void {
+    if (!this.ws) return;
+    
     this.ws.send(JSON.stringify({
       type: 'AGENT_STATUS',
       status: 'ready',
@@ -79,7 +112,7 @@ export class AnalysisAgent {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.main) {
   const agent = new AnalysisAgent({ id: process.env.AGENT_ID || 'analysis-1' });
   agent.connect();
 }

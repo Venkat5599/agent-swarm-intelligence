@@ -1,25 +1,48 @@
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
+import type { OrchestratorAgent } from './OrchestratorAgent';
+import type { Task } from '../types';
+import type { IncomingMessage } from 'http';
+
+interface Agent {
+  type: string;
+  id: string;
+  ws: WebSocket;
+  connectedAt: Date;
+  tasksCompleted: number;
+}
+
+interface AgentMessage {
+  type: string;
+  taskId?: string;
+  result?: any;
+  progress?: number;
+}
 
 export class SwarmCoordinator {
-  constructor(orchestrator) {
+  private orchestrator: OrchestratorAgent;
+  private wss: WebSocketServer | null;
+  private agents: Map<string, Agent>;
+  private port: number;
+
+  constructor(orchestrator: OrchestratorAgent) {
     this.orchestrator = orchestrator;
     this.wss = null;
-    this.agents = new Map(); // Connected specialized agents
-    this.port = process.env.ORCHESTRATOR_PORT || 3000;
+    this.agents = new Map();
+    this.port = parseInt(process.env.ORCHESTRATOR_PORT || '3000');
   }
 
-  async start() {
+  async start(): Promise<void> {
     this.wss = new WebSocketServer({ port: this.port });
     
-    this.wss.on('connection', (ws, req) => {
-      const agentType = req.headers['x-agent-type'];
-      const agentId = req.headers['x-agent-id'];
+    this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+      const agentType = req.headers['x-agent-type'] as string;
+      const agentId = req.headers['x-agent-id'] as string;
       
       if (agentType && agentId) {
         this.registerAgent(agentType, agentId, ws);
         
-        ws.on('message', async (data) => {
-          const message = JSON.parse(data.toString());
+        ws.on('message', async (data: Buffer) => {
+          const message = JSON.parse(data.toString()) as AgentMessage;
           await this.handleAgentMessage(agentType, agentId, message);
         });
         
@@ -32,7 +55,7 @@ export class SwarmCoordinator {
     console.log(`🌐 Swarm coordinator listening on port ${this.port}`);
   }
 
-  registerAgent(agentType, agentId, ws) {
+  private registerAgent(agentType: string, agentId: string, ws: WebSocket): void {
     const key = `${agentType}:${agentId}`;
     this.agents.set(key, {
       type: agentType,
@@ -45,17 +68,19 @@ export class SwarmCoordinator {
     console.log(`🔗 ${agentType} agent connected (${agentId})`);
   }
 
-  unregisterAgent(agentType, agentId) {
+  private unregisterAgent(agentType: string, agentId: string): void {
     const key = `${agentType}:${agentId}`;
     this.agents.delete(key);
     console.log(`🔌 ${agentType} agent disconnected (${agentId})`);
   }
 
-  async delegateTask(taskId, task) {
+  async delegateTask(taskId: string, task: Task, recommendedAgents?: string[]): Promise<void> {
     console.log(`🎯 Delegating task ${taskId}...`);
     
-    // Determine which agents are needed for this task
-    const requiredAgents = this.determineRequiredAgents(task);
+    // Use Pony's recommended agents if provided, otherwise determine from task
+    const requiredAgents = (recommendedAgents && recommendedAgents.length > 0)
+      ? recommendedAgents
+      : this.determineRequiredAgents(task);
     
     for (const agentType of requiredAgents) {
       const agent = this.findAvailableAgent(agentType);
@@ -68,9 +93,8 @@ export class SwarmCoordinator {
     }
   }
 
-  determineRequiredAgents(task) {
-    // Based on task type, determine which agents are needed
-    const agents = [];
+  private determineRequiredAgents(task: any): string[] {
+    const agents: string[] = [];
     
     if (task.requiresData) agents.push('research');
     if (task.requiresAnalysis) agents.push('analysis');
@@ -82,16 +106,16 @@ export class SwarmCoordinator {
     return agents;
   }
 
-  findAvailableAgent(agentType) {
+  private findAvailableAgent(agentType: string): Agent | null {
     for (const [key, agent] of this.agents) {
-      if (agent.type === agentType && agent.ws.readyState === 1) {
+      if (agent.type === agentType && agent.ws.readyState === WebSocket.OPEN) {
         return agent;
       }
     }
     return null;
   }
 
-  sendTaskToAgent(agent, taskId, task) {
+  private sendTaskToAgent(agent: Agent, taskId: string, task: Task): void {
     const message = {
       type: 'TASK_ASSIGNMENT',
       taskId,
@@ -103,14 +127,16 @@ export class SwarmCoordinator {
     console.log(`📤 Task ${taskId} assigned to ${agent.type} agent`);
   }
 
-  async handleAgentMessage(agentType, agentId, message) {
+  private async handleAgentMessage(agentType: string, agentId: string, message: AgentMessage): Promise<void> {
     switch (message.type) {
       case 'TASK_COMPLETE':
-        await this.orchestrator.handleAgentResponse(
-          agentType,
-          message.taskId,
-          message.result
-        );
+        if (message.taskId && message.result) {
+          await this.orchestrator.handleAgentResponse(
+            agentType,
+            message.taskId,
+            message.result
+          );
+        }
         break;
         
       case 'TASK_PROGRESS':
@@ -126,16 +152,16 @@ export class SwarmCoordinator {
     }
   }
 
-  broadcast(message) {
+  broadcast(message: any): void {
     for (const [key, agent] of this.agents) {
-      if (agent.ws.readyState === 1) {
+      if (agent.ws.readyState === WebSocket.OPEN) {
         agent.ws.send(JSON.stringify(message));
       }
     }
   }
 
-  getConnectedAgents() {
-    const agents = {};
+  getConnectedAgents(): Record<string, any[]> {
+    const agents: Record<string, any[]> = {};
     for (const [key, agent] of this.agents) {
       if (!agents[agent.type]) agents[agent.type] = [];
       agents[agent.type].push({
