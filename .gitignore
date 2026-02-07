@@ -1,10 +1,14 @@
 node_modules/
+dashboard/node_modules/
 .env
 *.log
 .DS_Store
 dist/
+dashboard/dist/
 build/
 coverage/
 .vscode/
 .idea/
 .keys/
+bun.lockb
+dashboard/bun.lockb
