@@ -1,0 +1,36 @@
+{
+  "name": "agent-swarm-intelligence",
+  "version": "1.0.0",
+  "description": "Multi-agent coordination platform where specialized agents work together to solve complex tasks",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "start:research": "node src/agents/ResearchAgent.js",
+    "start:analysis": "node src/agents/AnalysisAgent.js",
+    "start:trading": "node src/agents/TradingAgent.js",
+    "start:monitor": "node src/agents/MonitorAgent.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test src/**/*.test.js",
+    "status": "node scripts/status.js",
+    "create-project": "node scripts/create-swarm-project.js",
+    "submit-project": "node scripts/submit-project.js"
+  },
+  "keywords": [
+    "solana",
+    "agent",
+    "swarm",
+    "coordination",
+    "ai",
+    "multi-agent"
+  ],
+  "author": "orchestrator-ai",
+  "license": "MIT",
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.0",
+    "@solana/web3.js": "^1.95.0",
+    "dotenv": "^16.4.5",
+    "openai": "^6.18.0",
+    "ws": "^8.18.0"
+  }
+}
