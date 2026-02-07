@@ -15,6 +15,7 @@
     "dashboard:build": "cd dashboard && bun run build",
     "test": "bun test",
     "test:jupiter": "bun run scripts/test-jupiter.ts",
+    "test:quick": "bun run scripts/quick-test.ts",
     "status": "bun run scripts/status.ts",
     "setup-solana": "bun run scripts/setup-solana.ts",
     "fund-wallets": "bun run scripts/fund-wallets.ts",
