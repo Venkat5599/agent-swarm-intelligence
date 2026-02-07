@@ -169,7 +169,7 @@ Built for the Internet of Agents era. 🚀`,
     
     // Check if task is complete
     const status = await this.taskManager.getStatus(taskId);
-    if (status.complete) {
+    if (status && status.complete) {
       // Use Pony to coordinate final decision
       const agentResponses = status.progress;
       const coordination = await this.pony.coordinateAgents(agentResponses);

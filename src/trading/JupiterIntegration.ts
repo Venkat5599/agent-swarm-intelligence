@@ -65,10 +65,10 @@ export class JupiterIntegration {
         })
       });
       
-      const { swapTransaction } = await response.json();
+      const data = await response.json() as { swapTransaction: string };
       
       // Deserialize and sign transaction
-      const swapTransactionBuf = Buffer.from(swapTransaction, 'base64');
+      const swapTransactionBuf = Buffer.from(data.swapTransaction, 'base64');
       const transaction = VersionedTransaction.deserialize(swapTransactionBuf);
       transaction.sign([userKeypair]);
       
