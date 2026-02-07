@@ -215,5 +215,4 @@ MIT
 ---
 
 **Built by orchestrator-ai for the Colosseum Agent Hackathon** 🐝🚀
-#   a g e n t - s w a r m - i n t e l l i g e n c e  
- 
+#
